@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weed OS</title>
+<link rel="icon" href="assets/favicon.png">
+<link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
+<link rel="stylesheet" href="css/weed.css">
+</head>
+<body>
+<div id="boot"><img src="assets/logo-white.png" alt=""><h1>Weed OS</h1><div class="bar"><i></i></div></div>
+<div id="wallpaper"></div>
+<header id="menubar">
+  <div class="left">
+    <button id="apple" title="Menu Weed"><img src="assets/logo-white.png" alt="Weed"></button>
+    <strong id="appname">Finder</strong>
+  </div>
+  <div class="right">
+    <button id="spot-btn" title="Spotlight (Ctrl+Espace)"><i class="fa-solid fa-magnifying-glass"></i></button>
+    <i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-full"></i>
+    <button id="profile-button" title="Profil utilisateur"><img id="user-avatar" alt=""><span id="usr"></span></button><span id="clock"></span>
+  </div>
+</header>
+<div id="login" class="hidden"><form class="glass" id="lf" autocomplete="off"><img src="assets/logo-white.png" alt=""><h2 id="lt">Weed OS</h2><p id="ls"></p>
+<input class="t" id="lu" placeholder="Nom d'utilisateur" autocapitalize="off" spellcheck="false"><input class="t" id="lp" type="password" placeholder="Mot de passe"><button class="b pri" id="lb">Se connecter</button><small id="le" class="err"></small></form></div>
+<div id="toasts"></div>
+<div id="appmenu" class="glass hidden"></div>
+<div id="power-dialog" class="glass hidden" role="dialog" aria-modal="true" aria-label="Session et alimentation">
+  <div class="power-title"><b>Session et alimentation</b><button id="power-dismiss" aria-label="Fermer">×</button></div>
+  <button data-power="logout"><i class="fa-solid fa-right-from-bracket"></i><span><b>Se déconnecter</b><small>Fermer votre session utilisateur</small></span></button>
+  <button data-power="reboot"><i class="fa-solid fa-rotate"></i><span><b>Redémarrer</b><small>Relancer Weed OS et le système hôte</small></span></button>
+  <button data-power="poweroff" class="danger"><i class="fa-solid fa-power-off"></i><span><b>Éteindre</b><small>Arrêter Weed OS et demander l’arrêt de l’hôte</small></span></button>
+</div>
+<div id="shutdown-screen" class="hidden" aria-live="assertive">
+  <div class="shutdown-content"><img src="assets/logo-white.png" alt="Weed OS"><h1>Weed OS</h1><p id="shutdown-label">Shutdown</p><div class="shutdown-loader"><i></i></div><small id="shutdown-status">Fermeture des services…</small></div>
+</div>
+<main id="desktop"></main>
+<div id="snap-preview" aria-hidden="true"></div>
+<div id="edge-top" aria-hidden="true"></div>
+<div id="edge-bottom" aria-hidden="true"><i></i></div>
+<nav id="dock" class="glass" aria-label="Dock"></nav>
+<div id="appcenter" class="glass hidden" role="dialog" aria-label="App Center"><div class="ac-search"><i class="fa-solid fa-magnifying-glass"></i><input id="ac-search" placeholder="Rechercher une application…" autocomplete="off"></div><div id="ac-categories" class="ac-categories" aria-label="Catégories">
+<button type="button" class="selected" data-category="all">Tout</button>
+<button type="button" data-category="favorites">★ Favoris</button>
+<button type="button" data-category="files">Fichiers</button>
+<button type="button" data-category="tools">Outils</button>
+<button type="button" data-category="media">Multimédia</button>
+<button type="button" data-category="planning">Organisation</button>
+<button type="button" data-category="system">Système</button>
+</div><div id="ac-recent-section"><div class="ac-section">Utilisées récemment</div><div id="ac-recent"></div></div>
+<div class="ac-all-head"><div class="ac-section">Toutes les applications</div><small id="ac-count"></small></div><div id="ac-grid"></div></div>
+<div id="spotlight" class="hidden"><div class="glass"><i class="fa-solid fa-magnifying-glass"></i><input id="spot-in" placeholder="Rechercher une app…" autocomplete="off"><div id="spot-res"></div></div></div>
+<script src="js/i18n.js"></script>
+<script src="js/weed.js"></script>
+<script src="js/files.js"></script>
+<script src="js/pictoweed.js"></script>
+</body>
+</html>

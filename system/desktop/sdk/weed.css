@@ -1,0 +1,7 @@
+:root{color-scheme:dark;--accent:#2bff88}
+*{box-sizing:border-box}
+body{margin:0;font:14px -apple-system,"SF Pro Text","Inter",system-ui,sans-serif;color:#e9fff2;background:rgba(3,18,10,.55)}
+button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:inherit;border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{background:#0f7a43}button.pri{background:var(--accent);color:#012;font-weight:600;border-color:transparent}
+input,textarea,select{background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.16);border-radius:8px;color:inherit;padding:7px 10px;outline:none;font:inherit}
+input:focus,textarea:focus{border-color:var(--accent)}
