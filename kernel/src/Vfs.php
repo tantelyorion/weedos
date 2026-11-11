@@ -132,24 +132,50 @@ final class Vfs
     }
 
 
+    // ======================================================================================================
+    //  Archives (ZIP, TAR, TAR.GZ, TGZ) — liste, création, ajout, extraction, suppression, test, aperçu
+    // ======================================================================================================
+    private const ARC_MAX_ENTRIES = 5000;
+    private const ARC_MAX_BYTES = 314572800;      // 300 Mo extraits au maximum par opération
+    private const ARC_PREVIEW_MAX = 4194304;      // 4 Mo pour l'aperçu d'un fichier de l'archive
+
+    private function archiveFile(string $path): string
+    {
+        $full = $this->real($path);
+        if (!is_file($full) || is_link($full)) throw new \RuntimeException('Archive introuvable ou non sécurisée.');
+        return $full;
+    }
+    private function needZip(): void { if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Extension PHP zip indisponible pour les archives ZIP.'); }
+    private function needTar(): void { if (!TarArchive::available()) throw new \RuntimeException('Extension PHP zlib indisponible pour les archives TAR.'); }
+    private static function arcSafeName(string $name): bool
+    {
+        return !($name === '' || str_starts_with($name, '/') || preg_match('/^[A-Za-z]:/', $name) || preg_match('#(^|/)\.\.?(/|$)#', $name) || preg_match('/[\x00-\x1f\x7f]/', $name));
+    }
+    /** @return callable|null fn(string $name): bool — null si aucune sélection (= tout). */
+    private static function arcMatcher(array $selected): ?callable
+    {
+        $sel = array_fill_keys(array_filter(array_map(static fn($v) => str_replace('\\', '/', (string)$v), $selected), static fn($v) => $v !== ''), true);
+        if (!$sel) return null;
+        return static function (string $name) use ($sel): bool {
+            if (isset($sel[$name]) || isset($sel[rtrim($name, '/')])) return true;
+            foreach ($sel as $chosen => $_) { $pre = rtrim((string)$chosen, '/') . '/'; if ($pre !== '/' && str_starts_with($name, $pre)) return true; }
+            return false;
+        };
+    }
+    private static function arcUnique(string $dst): string
+    {
+        $dir = dirname($dst); $base = basename($dst);
+        $ext = (($p = strrpos($base, '.')) !== false && $p > 0) ? substr($base, $p) : ''; $stem = $ext === '' ? $base : substr($base, 0, -strlen($ext));
+        for ($i = 1; $i < 1000; $i++) { $c = $dir . '/' . $stem . ' (' . $i . ')' . $ext; if (!file_exists($c) && !is_link($c)) return $c; }
+        throw new \RuntimeException('Impossible de trouver un nom libre pour : ' . $base);
+    }
+
     /** Liste le contenu des archives ZIP et TAR (TAR, TAR.GZ, TGZ). */
     public function archiveList(string $path): array
     {
-        $full = $this->real($path);
-        if (!is_file($full) || is_link($full)) throw new \RuntimeException('Archive introuvable.');
-        if (preg_match('/\.(tar|tgz)$/i', $path) || preg_match('/\.tar\.gz$/i', $path)) {
-            if (!class_exists(\PharData::class)) throw new \RuntimeException('PharData indisponible pour lire les archives TAR.');
-            $tar = new \PharData($full);
-            $prefix = 'phar://' . $full . '/'; $items = [];
-            $it = new \RecursiveIteratorIterator($tar, \RecursiveIteratorIterator::SELF_FIRST);
-            foreach ($it as $entry) {
-                $uri = str_replace('\\', '/', $entry->getPathname());
-                $name = str_starts_with($uri, $prefix) ? substr($uri, strlen($prefix)) : $entry->getFilename();
-                $items[] = ['name' => $name . ($entry->isDir() && !str_ends_with($name, '/') ? '/' : ''), 'size' => $entry->isFile() ? (int)$entry->getSize() : 0, 'compressed' => 0, 'dir' => $entry->isDir()];
-            }
-            return $items;
-        }
-        if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Extension PHP zip indisponible pour les archives ZIP.');
+        $full = $this->archiveFile($path);
+        if (TarArchive::isTarName($path)) { $this->needTar(); return TarArchive::listing($full); }
+        $this->needZip();
         $zip = new \ZipArchive();
         if ($zip->open($full) !== true) throw new \RuntimeException('Archive ZIP invalide.');
         $items = [];
@@ -157,223 +183,310 @@ final class Vfs
             $st = $zip->statIndex($i);
             if (!$st) continue;
             $name = (string)$st['name'];
-            $items[] = ['name' => $name, 'size' => (int)($st['size'] ?? 0), 'compressed' => (int)($st['comp_size'] ?? 0), 'dir' => str_ends_with($name, '/')];
+            $items[] = ['name' => $name, 'size' => (int)($st['size'] ?? 0), 'compressed' => (int)($st['comp_size'] ?? 0), 'dir' => str_ends_with($name, '/'), 'mtime' => (int)($st['mtime'] ?? 0)];
         }
         $zip->close();
         return $items;
     }
 
-    /** Crée une archive ZIP à partir de chemins du VFS. */
+    /** Rassemble les éléments à archiver : [entrée, chemin réel, estDossier]. Les liens symboliques sont ignorés. */
+    private function arcCollect(array $sources, string $skipFull, string $inner): array
+    {
+        if (!$sources || count($sources) > 100) throw new \RuntimeException('Sélectionnez entre 1 et 100 éléments.');
+        $items = []; $files = 0; $prefix = $inner === '' ? '' : $inner . '/';
+        $walk = function (string $full, string $entry) use (&$walk, &$items, &$files, $skipFull): void {
+            if (is_link($full)) return;
+            if (is_dir($full)) {
+                $items[] = [rtrim($entry, '/') . '/', $full, true];
+                foreach (scandir($full) ?: [] as $n) if ($n !== '.' && $n !== '..') $walk($full . '/' . $n, rtrim($entry, '/') . '/' . $n);
+            } elseif (is_file($full) && $full !== $skipFull) {
+                if (++$files > self::ARC_MAX_ENTRIES) throw new \RuntimeException('Archive limitée à ' . self::ARC_MAX_ENTRIES . ' fichiers.');
+                $items[] = [$entry, $full, false];
+            }
+        };
+        foreach ($sources as $source) {
+            if (!is_string($source)) continue;
+            $norm = $this->norm($source);
+            if ($norm === '/') continue;
+            $full = $this->real($norm);
+            if (file_exists($full)) $walk($full, $prefix . basename($norm));
+        }
+        return $items;
+    }
+
+    /** Crée une archive ZIP / TAR / TAR.GZ à partir de chemins du VFS. */
     public function archiveCreate(string $target, array $sources): bool
     {
         if (!$sources || count($sources) > 100) throw new \RuntimeException('Sélectionnez entre 1 et 100 éléments.');
-        if (preg_match('/\.(tar|tgz)$/i', $target) || preg_match('/\.tar\.gz$/i', $target)) {
-            if (!class_exists(\PharData::class)) throw new \RuntimeException('PharData indisponible pour créer les archives TAR.');
-            $targetNorm = $this->norm($target); $targetFull = $this->real($targetNorm);
-            if (is_dir($targetFull) || !is_dir(dirname($targetFull)) || is_link(dirname($targetFull))) throw new \RuntimeException('Chemin de destination invalide.');
+        $targetNorm = $this->norm($target); $targetFull = $this->real($targetNorm);
+        if (is_dir($targetFull) || !is_dir(dirname($targetFull)) || is_link(dirname($targetFull))) throw new \RuntimeException('Chemin de destination invalide.');
+        if (TarArchive::isTarName($target)) {
+            $this->needTar();
             if (file_exists($targetFull)) throw new \RuntimeException('Un fichier du même nom existe déjà.');
-            $tarPath = preg_match('/\.(tgz|tar\.gz)$/i', $target) ? preg_replace('/\.(tgz|tar\.gz)$/i', '.tar', $targetFull) : $targetFull;
-            $tar = new \PharData($tarPath); $added = 0;
-            $walk = function(string $full, string $entry) use (&$walk, $tar, &$added): void {
-                if (is_link($full)) throw new \RuntimeException('Lien symbolique interdit dans une archive.');
-                if (is_dir($full)) { foreach (scandir($full) ?: [] as $n) if ($n !== '.' && $n !== '..') $walk($full . '/' . $n, rtrim($entry, '/') . '/' . $n); }
-                elseif (is_file($full)) { if (++$added > 2000) throw new \RuntimeException('Archive limitée à 2 000 fichiers.'); $tar->addFile($full, $entry); }
-            };
-            try { foreach ($sources as $source) { if (!is_string($source)) continue; $norm=$this->norm($source); if ($norm === '/' || $norm === $targetNorm) continue; $full=$this->real($norm); if (file_exists($full) && !is_link($full)) $walk($full, basename($norm)); } }
-            catch (\Throwable $e) { unset($tar); @unlink($tarPath); throw $e; }
-            unset($tar);
-            if ($tarPath !== $targetFull) { $phar = new \PharData($tarPath); $phar->compress(\Phar::GZ); unset($phar); @unlink($tarPath); $gzPath = $tarPath . '.gz'; if (!rename($gzPath, $targetFull)) throw new \RuntimeException('Impossible de finaliser l’archive TAR.GZ.'); }
+            $items = $this->arcCollect($sources, $targetFull, '');
+            if (!$items) throw new \RuntimeException('Aucun élément à archiver.');
+            $tmp = $targetFull . '.weed-tmp-' . bin2hex(random_bytes(4));
+            $w = TarArchive::openWrite($tmp, TarArchive::wantsGzip($target));
+            try {
+                foreach ($items as [$entry, $full, $isDir]) {
+                    if ($isDir) TarArchive::writeHeader($w, $entry, 0, (int)@filemtime($full), true);
+                    else TarArchive::addFile($w, $entry, $full);
+                }
+                TarArchive::closeWrite($w);
+                if (!rename($tmp, $targetFull)) throw new \RuntimeException('Impossible de finaliser l’archive.');
+            } catch (\Throwable $e) { TarArchive::abortWrite($w); @unlink($tmp); throw $e; }
             return true;
         }
-        if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Extension PHP zip indisponible.');
-        if (!$sources || count($sources) > 100) throw new \RuntimeException('Sélectionnez entre 1 et 100 éléments.');
-        $targetNorm = $this->norm($target);
-        $targetFull = $this->real($targetNorm);
-        if (is_dir($targetFull) || !is_dir(dirname($targetFull))) throw new \RuntimeException('Chemin de destination invalide.');
+        $this->needZip();
+        $items = $this->arcCollect($sources, $targetFull, '');
         $zip = new \ZipArchive();
         if ($zip->open($targetFull, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) throw new \RuntimeException('Impossible de créer le ZIP.');
-        $added = 0;
-        $walk = function(string $full, string $entry) use (&$walk, $zip, &$added, $targetFull): void {
-            if (is_link($full)) return;
-            if (is_dir($full)) {
-                $zip->addEmptyDir(rtrim($entry, '/') . '/');
-                foreach (scandir($full) ?: [] as $n) {
-                    if ($n === '.' || $n === '..') continue;
-                    $walk($full . '/' . $n, rtrim($entry, '/') . '/' . $n);
-                }
-            } elseif (is_file($full) && $full !== $targetFull) {
-                if (++$added > 2000) throw new \RuntimeException('Archive limitée à 2 000 fichiers.');
-                $zip->addFile($full, $entry);
-            }
-        };
         try {
-            foreach ($sources as $source) {
-                if (!is_string($source)) continue;
-                $norm = $this->norm($source);
-                if ($norm === '/' || $norm === $targetNorm) continue;
-                $full = $this->real($norm);
-                if (!file_exists($full)) continue;
-                $walk($full, basename($norm));
-            }
-            $zip->close();
-        } catch (\Throwable $e) {
-            $zip->close(); @unlink($targetFull); throw $e;
-        }
+            foreach ($items as [$entry, $full, $isDir]) { if ($isDir) $zip->addEmptyDir($entry); else $zip->addFile($full, $entry); }
+            if (!$zip->close()) throw new \RuntimeException('Impossible de finaliser le ZIP.');
+        } catch (\Throwable $e) { @$zip->close(); @unlink($targetFull); throw $e; }
         return true;
     }
 
-    /** Extrait un ZIP en refusant traversées, liens symboliques et collisions de chemins. */
-    public function archiveExtract(string $archive, string $destination, array $selected = []): array
+    /** Ajoute des fichiers/dossiers du VFS à une archive existante (remplace les entrées de même nom). */
+    public function archiveAdd(string $archive, array $sources, string $dir = ''): array
     {
-        $archiveFull = $this->real($archive);
-        if (preg_match('/\.(tar|tgz)$/i', $archive) || preg_match('/\.tar\.gz$/i', $archive)) {
-            if (!class_exists(\PharData::class)) throw new \RuntimeException('PharData indisponible pour extraire les archives TAR.');
-            $destNorm=$this->norm($destination); $destFull=$this->real($destNorm);
-            if (!is_file($archiveFull) || is_link($archiveFull) || !is_dir($destFull) || is_link($destFull)) throw new \RuntimeException('Archive ou dossier de destination invalide.');
-            $tar=new \PharData($archiveFull); $prefix='phar://' . $archiveFull . '/'; $selection=array_fill_keys(array_filter(array_map('strval',$selected)),true); $files=0; $total=0; $count=0;
-            $it=new \RecursiveIteratorIterator($tar, \RecursiveIteratorIterator::SELF_FIRST);
-            foreach($it as $entry){
-                $uri=str_replace('\\','/',$entry->getPathname()); $name=$uri; if(str_starts_with($uri,$prefix))$name=substr($uri,strlen($prefix));
-                $name=str_replace('\\','/',$name);
-                if($name==='' || str_starts_with($name,'/') || preg_match('/^[A-Za-z]:/',$name) || preg_match('#(^|/)\.\.?(/|$)#',$name) || preg_match('/[\x00-\x1f\x7f]/',$name)) throw new \RuntimeException('Chemin dangereux détecté dans le TAR.');
-                if($entry->isLink()) throw new \RuntimeException('Lien symbolique interdit dans le TAR.');
-                $match=!$selection || isset($selection[$name]) || isset($selection[rtrim($name,'/')]);
-                if(!$match) foreach($selection as $chosen=>$_){$pre=rtrim((string)$chosen,'/').'/';if(str_starts_with($name,$pre)){$match=true;break;}}
-                if(!$match)continue;
-                $out=$destFull.'/'.$name;
-                if($entry->isDir()){if(is_link($out))throw new \RuntimeException('Lien symbolique dans la destination.');if(!is_dir($out)&&!mkdir($out,0700,true))throw new \RuntimeException('Création de dossier impossible.');continue;}
-                $size=(int)$entry->getSize();$total+=$size;if(++$files>2000 || $total>104857600)throw new \RuntimeException('Archive TAR trop volumineuse (2 000 fichiers / 100 Mo maximum).');
-                $parent=dirname($out);if(!is_dir($parent)&&!mkdir($parent,0700,true))throw new \RuntimeException('Création de dossier impossible.');
-                $cursor=$parent;while($cursor!==$destFull && str_starts_with($cursor,$destFull.DIRECTORY_SEPARATOR)){if(is_link($cursor))throw new \RuntimeException('Lien symbolique présent dans la destination.');$cursor=dirname($cursor);}
-                if(file_exists($out)||is_link($out))throw new \RuntimeException('Collision avec un élément existant : '.$name);
-                $content=$entry->getContent();if(file_put_contents($out,$content,LOCK_EX)===false)throw new \RuntimeException('Écriture impossible : '.$name);@chmod($out,0600);$count++;
-            }
-            return ['files'=>$count,'destination'=>$destNorm];
-        }
-        if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Extension PHP zip indisponible.');
-        $zipFull = $this->real($archive);
-        $destNorm = $this->norm($destination);
-        $destFull = $this->real($destNorm);
-        if (!is_file($zipFull) || !is_dir($destFull) || is_link($destFull)) throw new \RuntimeException('Archive ou dossier de destination invalide.');
-        $zip = new \ZipArchive();
-        if ($zip->open($zipFull) !== true) throw new \RuntimeException('Archive ZIP invalide.');
-        $tmp = $destFull . '/.weed-extract-' . bin2hex(random_bytes(8));
-        $names = []; $total = 0;
-        $selection = array_fill_keys(array_filter(array_map('strval', $selected)), true);
-        try {
-            if ($zip->numFiles > 2000) throw new \RuntimeException('Archive trop volumineuse (2 000 entrées maximum).');
-            for ($i = 0; $i < $zip->numFiles; $i++) {
-                $st = $zip->statIndex($i);
-                if (!$st) throw new \RuntimeException('Entrée ZIP illisible.');
-                $raw = (string)$st['name'];
-                $name = str_replace('\\', '/', $raw);
-                if ($name === '' || str_starts_with($name, '/') || preg_match('/^[A-Za-z]:/', $name) ||
-                    preg_match('#(^|/)\.\.?(/|$)#', $name) || str_contains($name, "\0") ||
-                    preg_match('/[\x00-\x1f\x7f]/', $name)) {
-                    throw new \RuntimeException('Chemin dangereux détecté dans le ZIP.');
-                }
-                $opsys = 0; $attr = 0;
-                if ($zip->getExternalAttributesIndex($i, $opsys, $attr) && $opsys === \ZipArchive::OPSYS_UNIX) {
-                    $kind = ($attr >> 16) & 0170000;
-                    if ($kind === 0120000) throw new \RuntimeException('Lien symbolique interdit dans le ZIP.');
-                }
-                $key = strtolower(rtrim($name, '/'));
-                if ($key === '' || isset($names[$key])) throw new \RuntimeException('Entrées ZIP dupliquées ou ambiguës.');
-                if ($selection) {
-                    $matched = isset($selection[$name]) || isset($selection[rtrim($name, '/')]);
-                    if (!$matched) foreach ($selection as $chosen => $_) {
-                        $prefix = rtrim((string)$chosen, '/') . '/';
-                        if ($prefix !== '/' && str_starts_with($name, $prefix)) { $matched = true; break; }
+        $full = $this->archiveFile($archive);
+        $inner = trim(str_replace('\\', '/', $dir), '/');
+        if ($inner !== '' && !self::arcSafeName($inner)) throw new \RuntimeException('Dossier interne invalide.');
+        $items = $this->arcCollect($sources, $full, $inner);
+        if (!$items) throw new \RuntimeException('Aucun élément à ajouter.');
+        $added = count(array_filter($items, static fn($i) => !$i[2]));
+        if (TarArchive::isTarName($archive)) {
+            $this->needTar();
+            $new = []; foreach ($items as [$entry, , $isDir]) $new[rtrim($entry, '/')] = $isDir;
+            $seenDirs = [];
+            $tmp = $full . '.weed-tmp-' . bin2hex(random_bytes(4));
+            TarArchive::rewrite($full, $tmp, TarArchive::wantsGzip($archive),
+                static function (array $e) use ($new, &$seenDirs): bool {
+                    $k = rtrim($e['name'], '/');
+                    if ($e['dir']) { $seenDirs[$k] = true; return true; }
+                    return !isset($new[$k]);
+                },
+                static function (array $w) use ($items, &$seenDirs): void {
+                    foreach ($items as [$entry, $path, $isDir]) {
+                        if ($isDir) { if (!isset($seenDirs[rtrim($entry, '/')])) TarArchive::writeHeader($w, $entry, 0, (int)@filemtime($path), true); }
+                        else TarArchive::addFile($w, $entry, $path);
                     }
-                    if (!$matched) continue;
-                }
-                $names[$key] = ['index' => $i, 'name' => $name, 'dir' => str_ends_with($name, '/')];
-                $total += (int)($st['size'] ?? 0);
-                if ($total > 104857600) throw new \RuntimeException('Extraction limitée à 100 Mo.');
+                });
+            if (!rename($tmp, $full)) { @unlink($tmp); throw new \RuntimeException('Impossible de finaliser l’archive.'); }
+            return ['added' => $added];
+        }
+        $this->needZip();
+        $zip = new \ZipArchive();
+        if ($zip->open($full) !== true) throw new \RuntimeException('Archive ZIP invalide.');
+        try {
+            foreach ($items as [$entry, $path, $isDir]) {
+                if ($isDir) { if ($zip->locateName($entry) === false) $zip->addEmptyDir($entry); }
+                else $zip->addFile($path, $entry, 0, 0, \ZipArchive::FL_OVERWRITE);
             }
+            if (!$zip->close()) throw new \RuntimeException('Impossible de finaliser la modification de l’archive.');
+        } catch (\Throwable $e) { @$zip->close(); throw $e; }
+        return ['added' => $added];
+    }
 
+    /**
+     * Extrait une archive (ZIP, TAR, TAR.GZ) en refusant traversées, liens symboliques et collisions dangereuses.
+     * $mode (fichier déjà présent) : overwrite (remplacer), skip (ignorer), rename (garder les deux), error (refuser).
+     */
+    public function archiveExtract(string $archive, string $destination, array $selected = [], string $mode = 'overwrite'): array
+    {
+        if (!in_array($mode, ['overwrite', 'skip', 'rename', 'error'], true)) $mode = 'overwrite';
+        $archiveFull = $this->archiveFile($archive);
+        $destNorm = $this->norm($destination); $destFull = $this->real($destNorm);
+        if (!is_dir($destFull) || is_link($destFull)) throw new \RuntimeException('Dossier de destination invalide.');
+        $isTar = TarArchive::isTarName($archive);
+        if ($isTar) $this->needTar(); else $this->needZip();
+        $match = self::arcMatcher($selected);
+        $tmp = $destFull . '/.weed-extract-' . bin2hex(random_bytes(8));
+        $names = []; $total = 0; $zip = null;
+        try {
             if (!mkdir($tmp, 0700)) throw new \RuntimeException('Impossible de préparer l’extraction.');
-            $count = 0;
-            foreach ($names as $entry) {
-                $name = $entry['name'];
-                $out = $tmp . '/' . rtrim($name, '/');
-                if ($entry['dir']) {
-                    if (!is_dir($out) && !mkdir($out, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
-                    continue;
+            if ($isTar) {
+                TarArchive::walk($archiveFull, function (array $e, callable $read) use (&$names, &$total, $match, $tmp): void {
+                    $name = str_replace('\\', '/', $e['name']);
+                    if (!self::arcSafeName($name)) throw new \RuntimeException('Chemin dangereux détecté dans le TAR.');
+                    if ($e['link']) throw new \RuntimeException('Lien symbolique interdit dans le TAR.');
+                    if ($e['special'] || ($match && !$match($name))) return;
+                    $key = strtolower(rtrim($name, '/'));
+                    if (count($names) >= self::ARC_MAX_ENTRIES && !isset($names[$key])) throw new \RuntimeException('Archive trop volumineuse (' . self::ARC_MAX_ENTRIES . ' entrées maximum).');
+                    $out = $tmp . '/' . rtrim($name, '/');
+                    if ($e['dir']) {
+                        if (!is_dir($out) && !mkdir($out, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
+                        $names[$key] = ['name' => $name, 'dir' => true]; return;
+                    }
+                    $total += $e['size'];
+                    if ($total > self::ARC_MAX_BYTES) throw new \RuntimeException('Extraction limitée à 300 Mo.');
+                    $parent = dirname($out);
+                    if (!is_dir($parent) && !mkdir($parent, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
+                    $fh = fopen($out, 'wb'); if (!$fh) throw new \RuntimeException('Écriture impossible : ' . $name);
+                    try { $read(static function (string $c) use ($fh, $name): void { if (fwrite($fh, $c) === false) throw new \RuntimeException('Écriture impossible : ' . $name); }); }
+                    finally { fclose($fh); }
+                    @chmod($out, 0600);
+                    $names[$key] = ['name' => $name, 'dir' => false];
+                });
+            } else {
+                $zip = new \ZipArchive();
+                if ($zip->open($archiveFull) !== true) throw new \RuntimeException('Archive ZIP invalide.');
+                if ($zip->numFiles > self::ARC_MAX_ENTRIES) throw new \RuntimeException('Archive trop volumineuse (' . self::ARC_MAX_ENTRIES . ' entrées maximum).');
+                $chosen = [];
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $st = $zip->statIndex($i);
+                    if (!$st) throw new \RuntimeException('Entrée ZIP illisible.');
+                    $name = str_replace('\\', '/', (string)$st['name']);
+                    if (!self::arcSafeName($name)) throw new \RuntimeException('Chemin dangereux détecté dans le ZIP.');
+                    $opsys = 0; $attr = 0;
+                    if ($zip->getExternalAttributesIndex($i, $opsys, $attr) && $opsys === \ZipArchive::OPSYS_UNIX && ((($attr >> 16) & 0170000) === 0120000)) throw new \RuntimeException('Lien symbolique interdit dans le ZIP.');
+                    $key = strtolower(rtrim($name, '/'));
+                    if ($key === '' || isset($chosen[$key])) throw new \RuntimeException('Entrées ZIP dupliquées ou ambiguës.');
+                    if ($match && !$match($name)) continue;
+                    $chosen[$key] = ['index' => $i, 'name' => $name, 'dir' => str_ends_with($name, '/')];
+                    $total += (int)($st['size'] ?? 0);
+                    if ($total > self::ARC_MAX_BYTES) throw new \RuntimeException('Extraction limitée à 300 Mo.');
                 }
-                $parent = dirname($out);
-                if (!is_dir($parent) && !mkdir($parent, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
-                $data = $zip->getFromIndex($entry['index']);
-                if ($data === false || file_put_contents($out, $data, LOCK_EX) === false) throw new \RuntimeException('Écriture impossible : ' . $name);
-                @chmod($out, 0600);
-                $count++;
+                foreach ($chosen as $key => $entry) {
+                    $out = $tmp . '/' . rtrim($entry['name'], '/');
+                    if ($entry['dir']) { if (!is_dir($out) && !mkdir($out, 0700, true)) throw new \RuntimeException('Création de dossier impossible.'); $names[$key] = $entry; continue; }
+                    $parent = dirname($out);
+                    if (!is_dir($parent) && !mkdir($parent, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
+                    $in = $zip->getStream($zip->getNameIndex($entry['index']));
+                    $fh = $in ? fopen($out, 'wb') : false;
+                    if (!$in || !$fh) throw new \RuntimeException('Écriture impossible : ' . $entry['name']);
+                    try { while (!feof($in)) { $c = fread($in, 65536); if ($c === false) throw new \RuntimeException('Lecture impossible : ' . $entry['name']); if ($c !== '' && fwrite($fh, $c) === false) throw new \RuntimeException('Écriture impossible : ' . $entry['name']); } }
+                    finally { fclose($in); fclose($fh); }
+                    @chmod($out, 0600);
+                    $names[$key] = $entry;
+                }
             }
+            if (!$names) throw new \RuntimeException('Aucune entrée à extraire.');
 
-            // Déplace les fichiers sans suivre de liens préexistants dans la destination.
+            // Mise en place sans suivre de lien préexistant dans la destination.
+            $count = 0; $skipped = 0; $renamed = 0;
             foreach ($names as $entry) {
                 $name = rtrim($entry['name'], '/');
-                $src = $tmp . '/' . $name;
-                $dst = $destFull . '/' . $name;
-                $parent = dirname($dst);
-                $cursor = $parent;
-                while ($cursor !== $destFull && strpos($cursor, $destFull . DIRECTORY_SEPARATOR) === 0) {
+                $src = $tmp . '/' . $name; $dst = $destFull . '/' . $name; $parent = dirname($dst);
+                for ($cursor = $parent; $cursor !== $destFull && strpos($cursor, $destFull . DIRECTORY_SEPARATOR) === 0; $cursor = dirname($cursor)) {
                     if (is_link($cursor)) throw new \RuntimeException('Lien symbolique présent dans la destination.');
-                    $cursor = dirname($cursor);
                 }
                 if ($entry['dir']) {
                     if (is_link($dst)) throw new \RuntimeException('Lien symbolique présent dans la destination.');
+                    if (file_exists($dst) && !is_dir($dst)) throw new \RuntimeException('Un fichier porte déjà le nom du dossier : ' . $name);
                     if (!is_dir($dst) && !mkdir($dst, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
-                } else {
-                    if (!is_dir($parent) && !mkdir($parent, 0755, true)) throw new \RuntimeException('Création de dossier impossible.');
-                    if (is_link($dst) || is_dir($dst)) throw new \RuntimeException('Collision avec un élément existant.');
-                    if (file_exists($dst) && !unlink($dst)) throw new \RuntimeException('Remplacement impossible.');
-                    if (!rename($src, $dst)) throw new \RuntimeException('Déplacement impossible : ' . $name);
-                    @chmod($dst, 0600);
+                    continue;
                 }
+                if (!is_dir($parent) && !mkdir($parent, 0700, true)) throw new \RuntimeException('Création de dossier impossible.');
+                if (is_link($dst) || is_dir($dst) || file_exists($dst)) {
+                    if ($mode === 'skip') { $skipped++; continue; }
+                    if ($mode === 'error') throw new \RuntimeException('Collision avec un élément existant : ' . $name);
+                    if ($mode === 'rename' || is_link($dst) || is_dir($dst)) { $dst = self::arcUnique($dst); $renamed++; }
+                    elseif (!unlink($dst)) throw new \RuntimeException('Remplacement impossible : ' . $name);
+                }
+                if (!rename($src, $dst)) throw new \RuntimeException('Déplacement impossible : ' . $name);
+                @chmod($dst, 0600); $count++;
             }
-            return ['files' => $count, 'destination' => $destNorm];
+            return ['files' => $count, 'skipped' => $skipped, 'renamed' => $renamed, 'destination' => $destNorm];
         } finally {
-            $zip->close();
+            if ($zip) @$zip->close();
             if (is_dir($tmp)) {
                 $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($tmp, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
-                foreach ($it as $item) $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+                foreach ($it as $item) ($item->isDir() && !$item->isLink()) ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
                 @rmdir($tmp);
             }
         }
     }
 
-    /** Supprime des entrées sélectionnées d’un ZIP sans extraire son contenu. */
+    /** Supprime des entrées d’une archive (ZIP ou TAR/TAR.GZ) sans l’extraire. */
     public function archiveDelete(string $archive, array $entries): array
     {
-        if (!class_exists(\ZipArchive::class)) throw new \RuntimeException('Extension PHP zip indisponible.');
         if (!$entries || count($entries) > 500) throw new \RuntimeException('Sélectionnez entre 1 et 500 entrées.');
-        $full = $this->real($archive);
-        if (!is_file($full) || is_link($full)) throw new \RuntimeException('Archive introuvable ou non sécurisée.');
+        $full = $this->archiveFile($archive);
+        $match = self::arcMatcher($entries);
+        if (!$match) throw new \RuntimeException('Sélectionnez au moins une entrée.');
+        if (TarArchive::isTarName($archive)) {
+            $this->needTar();
+            $tmp = $full . '.weed-tmp-' . bin2hex(random_bytes(4));
+            [, $dropped] = TarArchive::rewrite($full, $tmp, TarArchive::wantsGzip($archive), static fn(array $e): bool => !$match(str_replace('\\', '/', $e['name'])));
+            if ($dropped === 0) { @unlink($tmp); throw new \RuntimeException('Aucune entrée sélectionnée trouvée.'); }
+            if (!rename($tmp, $full)) { @unlink($tmp); throw new \RuntimeException('Impossible de finaliser l’archive.'); }
+            return ['deleted' => $dropped];
+        }
+        $this->needZip();
         $zip = new \ZipArchive();
         if ($zip->open($full) !== true) throw new \RuntimeException('Archive ZIP invalide.');
-        $wanted = array_fill_keys(array_map(static fn($v) => str_replace('\\', '/', (string)$v), $entries), true);
         $deleted = 0;
         try {
             for ($i = $zip->numFiles - 1; $i >= 0; $i--) {
-                $st = $zip->statIndex($i);
-                if (!$st) continue;
-                $name = str_replace('\\', '/', (string)$st['name']);
-                $match = isset($wanted[$name]) || isset($wanted[rtrim($name, '/')]);
-                if (!$match) foreach ($wanted as $chosen => $_) {
-                    $prefix = rtrim((string)$chosen, '/') . '/';
-                    if ($prefix !== '/' && str_starts_with($name, $prefix)) { $match = true; break; }
-                }
-                if (!$match) continue;
-                if (!$zip->deleteIndex($i)) throw new \RuntimeException('Impossible de supprimer l’entrée : ' . $name);
+                $st = $zip->statIndex($i); if (!$st) continue;
+                if (!$match(str_replace('\\', '/', (string)$st['name']))) continue;
+                if (!$zip->deleteIndex($i)) throw new \RuntimeException('Impossible de supprimer l’entrée : ' . $st['name']);
                 $deleted++;
             }
             if ($deleted === 0) throw new \RuntimeException('Aucune entrée sélectionnée trouvée.');
             if (!$zip->close()) throw new \RuntimeException('Impossible de finaliser la modification de l’archive.');
             return ['deleted' => $deleted];
-        } catch (\Throwable $e) {
-            $zip->close();
-            throw $e;
+        } catch (\Throwable $e) { @$zip->close(); throw $e; }
+    }
+
+    /** Vérifie l’intégrité d’une archive (CRC ZIP / sommes de contrôle TAR). */
+    public function archiveTest(string $archive): array
+    {
+        $full = $this->archiveFile($archive); $tested = 0; $errors = [];
+        if (TarArchive::isTarName($archive)) {
+            $this->needTar();
+            try { TarArchive::walk($full, function (array $e, callable $read) use (&$tested) { if (!$e['dir'] && !$e['special']) { $read(static function (string $c): void {}); } $tested++; }); }
+            catch (\Throwable $t) { $errors[] = $t->getMessage(); }
+            return ['ok' => !$errors, 'tested' => $tested, 'errors' => $errors];
         }
+        $this->needZip();
+        $zip = new \ZipArchive();
+        if ($zip->open($full, \ZipArchive::CHECKCONS) !== true) return ['ok' => false, 'tested' => 0, 'errors' => ['Structure ZIP invalide ou corrompue.']];
+        for ($i = 0; $i < $zip->numFiles && count($errors) < 20; $i++) {
+            $st = $zip->statIndex($i); if (!$st) { $errors[] = 'Entrée illisible #' . $i; continue; }
+            $tested++;
+            if (str_ends_with((string)$st['name'], '/')) continue;
+            if ((int)$st['size'] > 67108864) continue;      // au-delà de 64 Mo : structure seulement
+            if ($zip->getFromIndex($i) === false) $errors[] = 'Données corrompues : ' . $st['name'];
+        }
+        $zip->close();
+        return ['ok' => !$errors, 'tested' => $tested, 'errors' => $errors];
+    }
+
+    /** Contenu d’une entrée (aperçu, 4 Mo max) encodé en base64. */
+    public function archiveRead(string $archive, string $entry): array
+    {
+        $full = $this->archiveFile($archive);
+        $entry = str_replace('\\', '/', $entry);
+        if (!self::arcSafeName($entry) || str_ends_with($entry, '/')) throw new \RuntimeException('Entrée invalide.');
+        $data = null;
+        if (TarArchive::isTarName($archive)) {
+            $this->needTar();
+            TarArchive::walk($full, function (array $e, callable $read) use ($entry, &$data): mixed {
+                if ($e['dir'] || str_replace('\\', '/', $e['name']) !== $entry) return null;
+                if ($e['size'] > self::ARC_PREVIEW_MAX) throw new \RuntimeException('Fichier trop volumineux pour l’aperçu (4 Mo maximum).');
+                $buf = ''; $read(static function (string $c) use (&$buf): void { $buf .= $c; }); $data = $buf; return false;
+            });
+        } else {
+            $this->needZip();
+            $zip = new \ZipArchive();
+            if ($zip->open($full) !== true) throw new \RuntimeException('Archive ZIP invalide.');
+            $i = $zip->locateName($entry);
+            if ($i !== false) {
+                $st = $zip->statIndex($i);
+                if ((int)($st['size'] ?? 0) > self::ARC_PREVIEW_MAX) { $zip->close(); throw new \RuntimeException('Fichier trop volumineux pour l’aperçu (4 Mo maximum).'); }
+                $d = $zip->getFromIndex($i); if ($d !== false) $data = $d;
+            }
+            $zip->close();
+        }
+        if ($data === null) throw new \RuntimeException('Entrée introuvable dans l’archive.');
+        $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
+        $mime = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp', 'bmp' => 'image/bmp', 'svg' => 'image/svg+xml', 'pdf' => 'application/pdf'][$ext]
+            ?? (in_array($ext, ['txt', 'md', 'json', 'xml', 'html', 'htm', 'css', 'js', 'php', 'csv', 'log', 'ini', 'conf', 'sh', 'py', 'c', 'h', 'yml', 'yaml', 'sql'], true) ? 'text/plain' : 'application/octet-stream');
+        return ['name' => $entry, 'size' => strlen($data), 'mime' => $mime, 'data' => base64_encode($data)];
     }
 
     /** Nom de fichier simple (sans séparateur ni caractère de contrôle). */

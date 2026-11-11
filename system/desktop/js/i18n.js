@@ -12,6 +12,72 @@
 (function () {
   const LANGS = ['en', 'es', 'zh', 'hi', 'ar', 'de', 'pt', 'mg'];
   const ROWS = [
+    /* ---- Gestionnaire d'archives ---- */
+    ["Nouvelle", "New", "Nueva", "新建", "नया", "جديد", "Neu", "Nova", "Vaovao"],
+    ["Extraire vers…", "Extract to…", "Extraer a…", "解压到…", "यहाँ निकालें…", "استخراج إلى…", "Extrahieren nach…", "Extrair para…", "Esory any amin’ny…"],
+    ["Extraire ici", "Extract here", "Extraer aquí", "解压到此处", "यहाँ निकालें", "استخراج هنا", "Hier extrahieren", "Extrair aqui", "Esory eto"],
+    ["Tester", "Test", "Probar", "测试", "जाँचें", "اختبار", "Prüfen", "Testar", "Andramo"],
+    ["Afficher", "View", "Ver", "查看", "देखें", "عرض", "Anzeigen", "Ver", "Asehoy"],
+    ["Informations", "Information", "Información", "信息", "जानकारी", "معلومات", "Informationen", "Informações", "Fampahalalana"],
+    ["Rechercher dans l'archive…", "Search in archive…", "Buscar en el archivo…", "在压缩包中搜索…", "संग्रह में खोजें…", "ابحث في الأرشيف…", "Im Archiv suchen…", "Pesquisar no arquivo…", "Hitady ao amin’ny arisiva…"],
+    ["Compressé", "Packed", "Comprimido", "压缩后", "संपीड़ित", "مضغوط", "Gepackt", "Comprimido", "Voatery"],
+    ["Type", "Type", "Tipo", "类型", "प्रकार", "النوع", "Typ", "Tipo", "Karazana"],
+    ["Modifié", "Modified", "Modificado", "修改时间", "संशोधित", "تاريخ التعديل", "Geändert", "Modificado", "Novaina"],
+    ["Dossier vide.", "Empty folder.", "Carpeta vacía.", "文件夹为空。", "फ़ोल्डर खाली है।", "المجلد فارغ.", "Leerer Ordner.", "Pasta vazia.", "Foana ny lahatahiry."],
+    ["Aucun résultat.", "No results.", "Sin resultados.", "无结果。", "कोई परिणाम नहीं।", "لا توجد نتائج.", "Keine Ergebnisse.", "Sem resultados.", "Tsy misy valiny."],
+    ["Aucun sous-dossier.", "No subfolders.", "Sin subcarpetas.", "没有子文件夹。", "कोई उप-फ़ोल्डर नहीं।", "لا توجد مجلدات فرعية.", "Keine Unterordner.", "Sem subpastas.", "Tsy misy lahatahiry kely."],
+    ["Gestionnaire d’archives", "Archive Manager", "Gestor de archivos comprimidos", "压缩包管理器", "संग्रह प्रबंधक", "مدير الأرشيف", "Archivverwaltung", "Gestor de arquivos", "Mpandrindra arisiva"],
+    ["Ouvrir une archive", "Open an archive", "Abrir un archivo", "打开压缩包", "संग्रह खोलें", "فتح أرشيف", "Archiv öffnen", "Abrir um arquivo", "Sokafy arisiva"],
+    ["Parcourir, extraire, modifier", "Browse, extract, edit", "Explorar, extraer, modificar", "浏览、解压、修改", "देखें, निकालें, संपादित करें", "تصفّح واستخرج وعدّل", "Durchsuchen, extrahieren, bearbeiten", "Explorar, extrair, modificar", "Jereo, esory, ovay"],
+    ["Nouvelle archive", "New archive", "Nuevo archivo", "新建压缩包", "नया संग्रह", "أرشيف جديد", "Neues Archiv", "Novo arquivo", "Arisiva vaovao"],
+    ["Compresser des fichiers et dossiers", "Compress files and folders", "Comprimir archivos y carpetas", "压缩文件和文件夹", "फ़ाइलें और फ़ोल्डर संपीड़ित करें", "ضغط الملفات والمجلدات", "Dateien und Ordner komprimieren", "Comprimir ficheiros e pastas", "Hanery rakitra sy lahatahiry"],
+    ["Choisir les fichiers et dossiers à compresser", "Choose the files and folders to compress", "Elige los archivos y carpetas a comprimir", "选择要压缩的文件和文件夹", "संपीड़ित करने के लिए फ़ाइलें और फ़ोल्डर चुनें", "اختر الملفات والمجلدات المراد ضغطها", "Dateien und Ordner zum Komprimieren wählen", "Escolha os ficheiros e pastas a comprimir", "Misafidiana ny rakitra sy lahatahiry hanery"],
+    ["Continuer", "Continue", "Continuar", "继续", "जारी रखें", "متابعة", "Weiter", "Continuar", "Tohizo"],
+    ["Dossier de destination", "Destination folder", "Carpeta de destino", "目标文件夹", "गंतव्य फ़ोल्डर", "مجلد الوجهة", "Zielordner", "Pasta de destino", "Lahatahiry tanjona"],
+    ["Choisir ce dossier", "Choose this folder", "Elegir esta carpeta", "选择此文件夹", "यह फ़ोल्डर चुनें", "اختيار هذا المجلد", "Diesen Ordner wählen", "Escolher esta pasta", "Safidio ity lahatahiry ity"],
+    ["Ajouter à l’archive", "Add to archive", "Añadir al archivo", "添加到压缩包", "संग्रह में जोड़ें", "إضافة إلى الأرشيف", "Zum Archiv hinzufügen", "Adicionar ao arquivo", "Ampio amin’ny arisiva"],
+    ["Créer l’archive", "Create archive", "Crear archivo", "创建压缩包", "संग्रह बनाएँ", "إنشاء الأرشيف", "Archiv erstellen", "Criar arquivo", "Mamoròna arisiva"],
+    ["Parcourir…", "Browse…", "Examinar…", "浏览…", "ब्राउज़ करें…", "استعراض…", "Durchsuchen…", "Procurar…", "Hijery…"],
+    ["Créer", "Create", "Crear", "创建", "बनाएँ", "إنشاء", "Erstellen", "Criar", "Foronina"],
+    ["Création…", "Creating…", "Creando…", "正在创建…", "बनाया जा रहा है…", "جارٍ الإنشاء…", "Wird erstellt…", "A criar…", "Eo am-pamoronana…"],
+    ["Destination", "Destination", "Destino", "目标", "गंतव्य", "الوجهة", "Ziel", "Destino", "Tanjona"],
+    ["Éléments à extraire", "Items to extract", "Elementos a extraer", "要解压的项目", "निकालने के आइटम", "العناصر المراد استخراجها", "Zu extrahierende Elemente", "Itens a extrair", "Singa hesorina"],
+    ["Toute l’archive", "Whole archive", "Todo el archivo", "整个压缩包", "पूरा संग्रह", "الأرشيف بالكامل", "Gesamtes Archiv", "Todo o arquivo", "Ny arisiva manontolo"],
+    ["Le dossier affiché", "The displayed folder", "La carpeta mostrada", "当前显示的文件夹", "दिखाया गया फ़ोल्डर", "المجلد المعروض", "Der angezeigte Ordner", "A pasta apresentada", "Ny lahatahiry aseho"],
+    ["Si un fichier existe déjà", "If a file already exists", "Si un archivo ya existe", "如果文件已存在", "यदि फ़ाइल पहले से मौजूद है", "إذا كان الملف موجوداً", "Wenn eine Datei bereits existiert", "Se um ficheiro já existir", "Raha efa misy ny rakitra"],
+    ["Remplacer", "Replace", "Reemplazar", "替换", "बदलें", "استبدال", "Ersetzen", "Substituir", "Soloy"],
+    ["Ignorer", "Skip", "Omitir", "跳过", "छोड़ें", "تخطّي", "Überspringen", "Ignorar", "Avela"],
+    ["Garder les deux (renommer)", "Keep both (rename)", "Conservar ambos (renombrar)", "保留两者（重命名）", "दोनों रखें (नाम बदलें)", "الاحتفاظ بالاثنين (إعادة تسمية)", "Beide behalten (umbenennen)", "Manter ambos (renomear)", "Tazony roa (ovay anarana)"],
+    ["Créer un dossier au nom de l’archive", "Create a folder named after the archive", "Crear una carpeta con el nombre del archivo", "创建与压缩包同名的文件夹", "संग्रह के नाम से फ़ोल्डर बनाएँ", "إنشاء مجلد باسم الأرشيف", "Ordner mit dem Namen des Archivs erstellen", "Criar uma pasta com o nome do arquivo", "Mamorona lahatahiry mitondra ny anaran’ny arisiva"],
+    ["Extraire", "Extract", "Extraer", "解压", "निकालें", "استخراج", "Extrahieren", "Extrair", "Esory"],
+    ["Extraction…", "Extracting…", "Extrayendo…", "正在解压…", "निकाला जा रहा है…", "جارٍ الاستخراج…", "Wird extrahiert…", "A extrair…", "Eo am-pisorana…"],
+    ["Extraction impossible", "Extraction failed", "Extracción imposible", "无法解压", "निकालना संभव नहीं", "تعذّر الاستخراج", "Extrahieren nicht möglich", "Extração impossível", "Tsy azo esorina"],
+    ["Extraction terminée", "Extraction complete", "Extracción terminada", "解压完成", "निकालना पूर्ण", "اكتمل الاستخراج", "Extraktion abgeschlossen", "Extração concluída", "Vita ny fanesorana"],
+    ["Ouverture…", "Opening…", "Abriendo…", "正在打开…", "खुल रहा है…", "جارٍ الفتح…", "Wird geöffnet…", "A abrir…", "Misokatra…"],
+    ["Archive illisible", "Unreadable archive", "Archivo ilegible", "无法读取压缩包", "संग्रह पढ़ा नहीं जा सका", "أرشيف غير قابل للقراءة", "Archiv nicht lesbar", "Arquivo ilegível", "Tsy azo vakiana ny arisiva"],
+    ["Format non pris en charge", "Unsupported format", "Formato no compatible", "不支持的格式", "असमर्थित प्रारूप", "تنسيق غير مدعوم", "Nicht unterstütztes Format", "Formato não suportado", "Endrika tsy tohanana"],
+    ["Formats pris en charge : ZIP, TAR, TAR.GZ.", "Supported formats: ZIP, TAR, TAR.GZ.", "Formatos admitidos: ZIP, TAR, TAR.GZ.", "支持的格式：ZIP、TAR、TAR.GZ。", "समर्थित प्रारूप: ZIP, TAR, TAR.GZ।", "التنسيقات المدعومة: ZIP وTAR وTAR.GZ.", "Unterstützte Formate: ZIP, TAR, TAR.GZ.", "Formatos suportados: ZIP, TAR, TAR.GZ.", "Endrika tohanana: ZIP, TAR, TAR.GZ."],
+    ["Ajout en cours…", "Adding…", "Añadiendo…", "正在添加…", "जोड़ा जा रहा है…", "جارٍ الإضافة…", "Wird hinzugefügt…", "A adicionar…", "Eo am-pampidirana…"],
+    ["Ajout impossible", "Could not add", "No se pudo añadir", "无法添加", "जोड़ना संभव नहीं", "تعذّرت الإضافة", "Hinzufügen nicht möglich", "Não foi possível adicionar", "Tsy azo ampiana"],
+    ["Suppression en cours…", "Deleting…", "Eliminando…", "正在删除…", "हटाया जा रहा है…", "جارٍ الحذف…", "Wird gelöscht…", "A eliminar…", "Eo am-pamafana…"],
+    ["Suppression impossible", "Could not delete", "No se pudo eliminar", "无法删除", "हटाना संभव नहीं", "تعذّر الحذف", "Löschen nicht möglich", "Não foi possível eliminar", "Tsy azo fafana"],
+    ["Test en cours…", "Testing…", "Probando…", "正在测试…", "जाँच हो रही है…", "جارٍ الاختبار…", "Wird geprüft…", "A testar…", "Eo am-pandramana…"],
+    ["Test de l’archive", "Archive test", "Prueba del archivo", "压缩包测试", "संग्रह जाँच", "اختبار الأرشيف", "Archivprüfung", "Teste do arquivo", "Fitsapana ny arisiva"],
+    ["L’archive contient des erreurs.", "The archive contains errors.", "El archivo contiene errores.", "压缩包包含错误。", "संग्रह में त्रुटियाँ हैं।", "يحتوي الأرشيف على أخطاء.", "Das Archiv enthält Fehler.", "O arquivo contém erros.", "Misy hadisoana ny arisiva."],
+    ["Archive saine.", "Archive is healthy.", "Archivo sano.", "压缩包完好。", "संग्रह ठीक है।", "الأرشيف سليم.", "Archiv ist in Ordnung.", "Arquivo saudável.", "Salama ny arisiva."],
+    ["Archive endommagée.", "Archive is damaged.", "Archivo dañado.", "压缩包已损坏。", "संग्रह क्षतिग्रस्त है।", "الأرشيف تالف.", "Archiv ist beschädigt.", "Arquivo danificado.", "Simba ny arisiva."],
+    ["Test impossible", "Test failed", "Prueba imposible", "无法测试", "जाँच संभव नहीं", "تعذّر الاختبار", "Prüfung nicht möglich", "Teste impossível", "Tsy azo andramana"],
+    ["Lecture…", "Reading…", "Leyendo…", "正在读取…", "पढ़ा जा रहा है…", "جارٍ القراءة…", "Wird gelesen…", "A ler…", "Mamaky…"],
+    ["Aperçu impossible", "Preview unavailable", "Vista previa imposible", "无法预览", "पूर्वावलोकन संभव नहीं", "تعذّرت المعاينة", "Vorschau nicht möglich", "Pré-visualização impossível", "Tsy azo jerena mialoha"],
+    ["Aperçu indisponible pour ce type de fichier. Extrayez-le pour l’ouvrir.", "Preview not available for this file type. Extract it to open it.", "Vista previa no disponible para este tipo de archivo. Extráelo para abrirlo.", "此文件类型无法预览。请解压后打开。", "इस फ़ाइल प्रकार का पूर्वावलोकन उपलब्ध नहीं। खोलने के लिए इसे निकालें।", "المعاينة غير متاحة لهذا النوع. استخرجه لفتحه.", "Keine Vorschau für diesen Dateityp. Zum Öffnen extrahieren.", "Pré-visualização indisponível para este tipo de ficheiro. Extraia-o para o abrir.", "Tsy misy fijerena mialoha ho an’ity karazana rakitra ity. Esory vao sokafy."],
+    ["Extraire ce fichier…", "Extract this file…", "Extraer este archivo…", "解压此文件…", "यह फ़ाइल निकालें…", "استخراج هذا الملف…", "Diese Datei extrahieren…", "Extrair este ficheiro…", "Esory ity rakitra ity…"],
+    ["Emplacement", "Location", "Ubicación", "位置", "स्थान", "الموقع", "Speicherort", "Localização", "Toerana"],
+    ["Format", "Format", "Formato", "格式", "प्रारूप", "التنسيق", "Format", "Formato", "Endrika"],
+    ["Taille de l’archive", "Archive size", "Tamaño del archivo", "压缩包大小", "संग्रह का आकार", "حجم الأرشيف", "Archivgröße", "Tamanho do arquivo", "Habeny ny arisiva"],
+    ["Taille décompressée", "Unpacked size", "Tamaño descomprimido", "解压后大小", "अनपैक आकार", "الحجم بعد فك الضغط", "Entpackte Größe", "Tamanho descomprimido", "Habe rehefa esorina"],
+    ["Gain de place", "Space saved", "Espacio ahorrado", "节省空间", "बचाई गई जगह", "المساحة الموفّرة", "Platzersparnis", "Espaço poupado", "Toerana voavonjy"],
+    ["Fichiers", "Files", "Archivos", "文件", "फ़ाइलें", "الملفات", "Dateien", "Ficheiros", "Rakitra"],
+    ["Dossiers", "Folders", "Carpetas", "文件夹", "फ़ोल्डर", "المجلدات", "Ordner", "Pastas", "Lahatahiry"],
     /* ---- Pictoweed ---- */
     ["Bibliothèque", "Library", "Biblioteca", "图库", "लाइब्रेरी", "المكتبة", "Bibliothek", "Biblioteca", "Tahiry sary"],
     ["Toutes les photos", "All photos", "Todas las fotos", "所有照片", "सभी फ़ोटो", "كل الصور", "Alle Fotos", "Todas as fotografias", "Sary rehetra"],
@@ -420,6 +486,25 @@
 
   /* Chaînes à paramètres : [regex sur le français, [en, es, zh, hi, ar, de, pt, mg]] ($1, $2… = captures) */
   const PATTERNS = [
+    [/^([A-Z0-9]+) · Fichier$/, ["$1 · File", "$1 · Archivo", "$1 · 文件", "$1 · फ़ाइल", "$1 · ملف", "$1 · Datei", "$1 · Ficheiro", "$1 · Rakitra"]],
+    [/^(\d+) élément\(s\) sélectionné\(s\)$/, ["$1 item(s) selected", "$1 elemento(s) seleccionado(s)", "已选择 $1 项", "$1 आइटम चयनित", "تم تحديد $1 عنصر", "$1 Element(e) ausgewählt", "$1 item(ns) selecionado(s)", "singa $1 voafidy"]],
+    [/^(\d+) sélectionné\(s\)$/, ["$1 selected", "$1 seleccionado(s)", "已选 $1 项", "$1 चयनित", "تم تحديد $1", "$1 ausgewählt", "$1 selecionado(s)", "$1 voafidy"]],
+    [/^La sélection \((\d+)\)$/, ["The selection ($1)", "La selección ($1)", "所选项目（$1）", "चयन ($1)", "التحديد ($1)", "Die Auswahl ($1)", "A seleção ($1)", "Ny voafidy ($1)"]],
+    [/^(\d+) élément\(s\) affiché\(s\)$/, ["$1 item(s) shown", "$1 elemento(s) mostrado(s)", "显示 $1 项", "$1 आइटम दिखाए गए", "عرض $1 عنصر", "$1 Element(e) angezeigt", "$1 item(ns) apresentado(s)", "singa $1 aseho"]],
+    [/^(\d+) fichier\(s\)$/, ["$1 file(s)", "$1 archivo(s)", "$1 个文件", "$1 फ़ाइलें", "$1 ملف", "$1 Datei(en)", "$1 ficheiro(s)", "rakitra $1"]],
+    [/^(\d+) fichier\(s\) extrait\(s\)$/, ["$1 file(s) extracted", "$1 archivo(s) extraído(s)", "已解压 $1 个文件", "$1 फ़ाइलें निकाली गईं", "تم استخراج $1 ملف", "$1 Datei(en) extrahiert", "$1 ficheiro(s) extraído(s)", "rakitra $1 voasoroka"]],
+    [/^(\d+) fichier\(s\) extrait\(s\) dans (.+)$/, ["$1 file(s) extracted to $2", "$1 archivo(s) extraído(s) en $2", "已解压 $1 个文件到 $2", "$1 फ़ाइलें $2 में निकाली गईं", "تم استخراج $1 ملف إلى $2", "$1 Datei(en) nach $2 extrahiert", "$1 ficheiro(s) extraído(s) para $2", "rakitra $1 voasoroka tao amin’ny $2"]],
+    [/^(\d+) ignoré\(s\)$/, ["$1 skipped", "$1 omitido(s)", "跳过 $1 个", "$1 छोड़े गए", "تم تخطّي $1", "$1 übersprungen", "$1 ignorado(s)", "$1 navela"]],
+    [/^(\d+) renommé\(s\)$/, ["$1 renamed", "$1 renombrado(s)", "重命名 $1 个", "$1 का नाम बदला गया", "تمت إعادة تسمية $1", "$1 umbenannt", "$1 renomeado(s)", "$1 novaina anarana"]],
+    [/^(\d+) fichier\(s\) ajouté\(s\)\.$/, ["$1 file(s) added.", "$1 archivo(s) añadido(s).", "已添加 $1 个文件。", "$1 फ़ाइलें जोड़ी गईं।", "تمت إضافة $1 ملف.", "$1 Datei(en) hinzugefügt.", "$1 ficheiro(s) adicionado(s).", "rakitra $1 nampidirina."]],
+    [/^(\d+) entrée\(s\) supprimée\(s\)\.$/, ["$1 entr(y/ies) deleted.", "$1 entrada(s) eliminada(s).", "已删除 $1 个条目。", "$1 प्रविष्टियाँ हटाई गईं।", "تم حذف $1 إدخال.", "$1 Eintrag/Einträge gelöscht.", "$1 entrada(s) eliminada(s).", "tsipiriany $1 voafafa."]],
+    [/^Supprimer (\d+) élément\(s\) de l’archive \? Cette action est irréversible\.$/, ["Delete $1 item(s) from the archive? This cannot be undone.", "¿Eliminar $1 elemento(s) del archivo? Esta acción es irreversible.", "从压缩包中删除 $1 项？此操作无法撤销。", "संग्रह से $1 आइटम हटाएँ? यह कार्रवाई पूर्ववत नहीं हो सकती।", "حذف $1 عنصر من الأرشيف؟ لا يمكن التراجع عن هذا الإجراء.", "$1 Element(e) aus dem Archiv löschen? Diese Aktion kann nicht rückgängig gemacht werden.", "Eliminar $1 item(ns) do arquivo? Esta ação é irreversível.", "Fafana ve ny singa $1 ao amin’ny arisiva? Tsy azo averina ity asa ity."]],
+    [/^Aucune erreur : (\d+) entrée\(s\) vérifiée\(s\)\.$/, ["No errors: $1 entr(y/ies) checked.", "Sin errores: $1 entrada(s) verificada(s).", "没有错误：已检查 $1 个条目。", "कोई त्रुटि नहीं: $1 प्रविष्टियाँ जाँची गईं।", "لا أخطاء: تم فحص $1 إدخال.", "Keine Fehler: $1 Eintrag/Einträge geprüft.", "Sem erros: $1 entrada(s) verificada(s).", "Tsy misy hadisoana: tsipiriany $1 notsapaina."]],
+    [/^Données corrompues : (.+)$/, ["Corrupted data: $1", "Datos corruptos: $1", "数据已损坏：$1", "दूषित डेटा: $1", "بيانات تالفة: $1", "Beschädigte Daten: $1", "Dados corrompidos: $1", "Angona simba: $1"]],
+    [/^([\d.,]+) o$/, ["$1 B", "$1 B", "$1 B", "$1 B", "$1 B", "$1 B", "$1 B", "$1 o"]],
+    [/^([\d.,]+) Ko$/, ["$1 KB", "$1 KB", "$1 KB", "$1 KB", "$1 KB", "$1 KB", "$1 KB", "$1 Ko"]],
+    [/^([\d.,]+) Mo$/, ["$1 MB", "$1 MB", "$1 MB", "$1 MB", "$1 MB", "$1 MB", "$1 MB", "$1 Mo"]],
+    [/^([\d.,]+) Go$/, ["$1 GB", "$1 GB", "$1 GB", "$1 GB", "$1 GB", "$1 GB", "$1 GB", "$1 Go"]],
     [/^(\d+) sélectionnée\(s\) sur (\d+)$/, ["$1 selected of $2", "$1 seleccionada(s) de $2", "已选 $1 / 共 $2", "$2 में से $1 चयनित", "تم تحديد $1 من $2", "$1 von $2 ausgewählt", "$1 selecionada(s) de $2", "$1 voafidy tamin’ny $2"]],
     [/^(\d+) photo\(s\)$/, ["$1 photo(s)", "$1 foto(s)", "$1 张照片", "$1 फ़ोटो", "$1 صورة", "$1 Foto(s)", "$1 fotografia(s)", "Sary $1"]],
     [/^Ajouté à l'album « (.+) »$/, ["Added to album “$1”", "Añadido al álbum «$1»", "已添加到相册“$1”", "एल्बम “$1” में जोड़ा गया", "تمت الإضافة إلى الألبوم «$1»", "Zum Album „$1“ hinzugefügt", "Adicionado ao álbum «$1»", "Nampidirina tao amin’ny rakitsary “$1”"]],
@@ -472,6 +557,11 @@
     const key = norm(core);
     const hit = MAP.get(key);
     if (hit && hit[i]) return source.replace(core, () => hit[i]);
+    if (core.includes(' · ')) {
+      const segs = core.split(' · '); let any = false;
+      const outs = segs.map(x => { const r = translate(x, l); if (r != null) any = true; return r ?? x; });
+      if (any) return source.replace(core, () => outs.join(' · '));
+    }
     const parts = core.split(/(?<=[.!?…])\s+/);
     if (parts.length > 1) {
       const outs = parts.map(x => { const h = MAP.get(norm(x)); return h && h[i] ? h[i] : null; });

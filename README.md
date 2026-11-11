@@ -350,3 +350,13 @@ Application photo intégrée (catégorie Multimédia, aussi proposée dans « Ou
 - **Enregistrer** (remplace le fichier JPEG/PNG) ou **Enregistrer une copie** (`nom-edit.ext`) ; téléchargement possible.
 - **Diaporama** plein cadre, **import** par bouton ou glisser-déposer (vers `/Pictures`), suppression.
 Aucune dépendance externe : tout le traitement d'image se fait dans le navigateur (canvas), sans `ctx.filter`, donc compatible WPE WebKit.
+
+## Gestionnaire d'archives
+
+`system/desktop/js/archive.js` (+ `kernel/src/TarArchive.php`, `Vfs::archive*`) — interface type WinRAR, sans la liste du gestionnaire de fichiers :
+- **Formats** : ZIP, TAR, TAR.GZ/TGZ (lecture, création, extraction, ajout, suppression).
+- **Vue d'archive** : navigation dans les dossiers de l'archive, colonnes triables (nom, taille, compressé, type, date), recherche, sélection multiple, aperçu texte/image.
+- **Outils** : Ajouter, Extraire vers… (remplacer / ignorer / garder les deux, dossier au nom de l'archive), Extraire ici, Tester l'intégrité, Supprimer, Informations.
+- **Noyau** : syscalls `fs.zip.list|create|extract|add|delete|test|read`. L'extraction refuse « .. », chemins absolus, liens symboliques et collisions dangereuses, borne le nombre d'entrées (5000) et la taille (300 Mo).
+- Correction : l'extraction TAR.GZ (PharData) produisait des fichiers vides ; remplacée par un lecteur/écrivain TAR en flux (`TarArchive`), compatible avec `tar` GNU (noms longs, `./`).
+- Test : `make check-archives`.

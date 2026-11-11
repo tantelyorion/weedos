@@ -8,6 +8,7 @@ help:
 	@echo "make init       - compile weedinit (Rust, musl statique)"
 	@echo "make check-project - vérifie la syntaxe PHP et les fonds d’écran"
 	@echo "make check-locales - vérifie les catalogues des neuf langues"
+	@echo "make check-archives - teste les archives ZIP/TAR/TAR.GZ (création, extraction, ajout, suppression, sécurité)"
 	@echo "make check-metrics  - teste les métriques système en lecture seule"
 	@echo "make check-processes - teste l’inventaire des processus /proc en lecture seule"
 	@echo "make check-services - teste l’inventaire init.d en lecture seule"
@@ -74,12 +75,15 @@ check-worker:
 	php tests/worker-smoke.php
 check-files:
 	php tests/files-smoke.php
+check-archives:
+	php tests/archive-smoke.php
 check-desktop:
 	node tests/desktop-e2e.js
 check-features:
 	php tests/system-features-smoke.php
 check-browser:
 	php tests/gnanja-browser-smoke.php
+	php tests/gnanja-worker-smoke.php
 check-mail:
 	php tests/mail-mime-smoke.php
 check-connectivity:

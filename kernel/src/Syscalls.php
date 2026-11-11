@@ -44,7 +44,10 @@ final class Syscalls
             case 'fs.move':     return $this->vfs->move($s('src'), $s('dst'));
             case 'fs.zip.list': return $this->vfs->archiveList($s('path'));
             case 'fs.zip.create': return $this->vfs->archiveCreate($s('target'), (array)($a['sources'] ?? []));
-            case 'fs.zip.extract': return $this->vfs->archiveExtract($s('archive'), $s('destination', '/'), (array)($a['entries'] ?? []));
+            case 'fs.zip.extract': return $this->vfs->archiveExtract($s('archive'), $s('destination', '/'), (array)($a['entries'] ?? []), $s('mode', 'overwrite'));
+            case 'fs.zip.add': return $this->vfs->archiveAdd($s('archive'), (array)($a['sources'] ?? []), $s('dir'));
+            case 'fs.zip.test': return $this->vfs->archiveTest($s('archive'));
+            case 'fs.zip.read': return $this->vfs->archiveRead($s('archive'), $s('entry'));
             case 'fs.zip.delete': return $this->vfs->archiveDelete($s('archive'), (array)($a['entries'] ?? []));
             case 'prog.list':   return $this->pkg->list();
             case 'prog.enable': return $this->pkg->setEnabled($s('id'), true);
