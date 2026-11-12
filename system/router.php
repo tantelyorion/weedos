@@ -4,7 +4,7 @@ declare(strict_types=1);
 define('WEED_ROOT', getenv('WEED_ROOT') ?: dirname(__DIR__));
 require_once WEED_ROOT . '/kernel/autoload.php';
 
-use Weed\{Auth, Vfs, Programs, Syscalls};
+use Weed\{Auth, Vfs, Programs, Syscalls, Media};
 
 $uri = rawurldecode((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH));
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -26,19 +26,27 @@ function weed_json(array $data, int $code = 200): void
 
 
 // v0.8.7 — lecture d'un fichier du dossier personnel (images, audio, vidéo, PDF) avec support des plages (seek).
-if ($uri === '/fs-file' && ($method === 'GET' || $method === 'HEAD')) {
+// v1.0.2 : /media-stream?t=<jeton signé> — même lecture en flux, pour les Programmes isolés (sans cookie) ; audio/vidéo/images seulement.
+$isStream = ($uri === '/media-stream');
+if (($uri === '/fs-file' || $isStream) && ($method === 'GET' || $method === 'HEAD')) {
     try {
-        $user = (new Auth())->current();
-        if (!$user) { http_response_code(401); echo 'non connecté'; return true; }
-        $info = (new Vfs($user['name']))->fileInfo((string)($_GET['path'] ?? ''));
-    } catch (Throwable $e) { http_response_code(404); echo 'introuvable'; return true; }
+        if ($isStream) {
+            $tk = Media::verifyToken((string)($_GET['t'] ?? ''));
+            $info = (new Vfs($tk['u']))->fileInfo($tk['p']);
+        } else {
+            $user = (new Auth())->current();
+            if (!$user) { http_response_code(401); echo 'non connecté'; return true; }
+            $info = (new Vfs($user['name']))->fileInfo((string)($_GET['path'] ?? ''));
+        }
+    } catch (Throwable $e) { http_response_code($isStream ? 403 : 404); echo $isStream ? 'refusé' : 'introuvable'; return true; }
     $ext = strtolower(pathinfo($info['name'], PATHINFO_EXTENSION));
     $media = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp', 'bmp' => 'image/bmp', 'ico' => 'image/x-icon', 'avif' => 'image/avif',
         'mp3' => 'audio/mpeg', 'wav' => 'audio/wav', 'ogg' => 'audio/ogg', 'oga' => 'audio/ogg', 'm4a' => 'audio/mp4', 'aac' => 'audio/aac', 'flac' => 'audio/flac', 'opus' => 'audio/ogg',
         'mp4' => 'video/mp4', 'm4v' => 'video/mp4', 'webm' => 'video/webm', 'ogv' => 'video/ogg', 'mov' => 'video/quicktime', 'mkv' => 'video/x-matroska',
         'pdf' => 'application/pdf'];
-    $download = isset($_GET['dl']);
+    $download = isset($_GET['dl']) && !$isStream;
     $type = $media[$ext] ?? null;
+    if ($isStream && ($type === null || $type === 'application/pdf')) { http_response_code(403); echo 'refusé'; return true; }
     if ($ext === 'svg') { $type = 'image/svg+xml'; header("Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'"); }
     if ($type === null || $download) {
         // Tout le reste (HTML, JS, texte…) n'est jamais interprété par le navigateur : téléchargement ou texte brut.

@@ -7,7 +7,7 @@ final class RoleManager
 {
     private const ROLES = [
         'admin' => ['*'],
-        'user' => ['sys.info','system.metrics','proc.list','fs.list','fs.read','fs.write','fs.mkdir','fs.rm','fs.copy','fs.move','fs.zip.list','fs.zip.create','fs.zip.extract','fs.zip.delete','fs.zip.add','fs.zip.test','fs.zip.read','prog.list','user.passwd.self','shell.exec'],
+        'user' => ['sys.info','system.metrics','proc.list','fs.list','fs.read','fs.write','fs.mkdir','fs.rm','fs.copy','fs.move','fs.zip.list','fs.zip.create','fs.zip.extract','fs.zip.delete','fs.zip.add','fs.zip.test','fs.zip.read','prog.list','user.passwd.self','shell.exec','media.status','media.probe','media.thumbnail','media.url','media.convert','media.extract_audio','media.trim','media.render','media.concat','media.job.status','media.job.list','media.job.cancel'],
     ];
 
     public static function roles(): array

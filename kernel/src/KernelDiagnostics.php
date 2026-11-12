@@ -16,6 +16,7 @@ final class KernelDiagnostics
         $add('OpenSSL', extension_loaded('openssl') ? 'ok' : 'warning', extension_loaded('openssl') ? 'Disponible' : 'Extension absente');
         $add('Archive ZIP', class_exists(\ZipArchive::class) ? 'ok' : 'warning', class_exists(\ZipArchive::class) ? 'Disponible' : 'Extension absente');
         $add('Dossier de données', is_dir(WEED_DATA) && !is_link(WEED_DATA) ? 'ok' : 'error', is_dir(WEED_DATA) ? (is_link(WEED_DATA) ? 'Lien symbolique interdit' : 'Accessible') : 'Absent');
+        $add('Moteur média (FFmpeg)', Media::available() ? 'ok' : 'warning', Media::available() ? 'FFmpeg et FFprobe détectés' : 'FFmpeg/FFprobe absents : les Programmes média ne fonctionneront pas');
         $log = WEED_DATA . '/var/log/kernel.log';
         $add('Journal Kernel', is_file($log) && !is_link($log) && is_readable($log) ? 'ok' : 'warning', is_file($log) ? 'Lisible' : 'Non créé');
         $add('Mode de démarrage', is_dir('/sys/firmware/efi') ? 'ok' : 'info', is_dir('/sys/firmware/efi') ? 'UEFI détecté' : 'BIOS/Legacy ou environnement non Linux');

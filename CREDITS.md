@@ -28,4 +28,8 @@ Les numéros correspondent à l'ordre dans Réglages (`wallpaper-NN.jpg`). « Pe
 
 ## Composants tiers de l'édition bootable
 Linux (GPL-2.0), Buildroot (GPL-2.0+), PHP (PHP License 3.01), GRUB 2 (GPL-3.0+), cage (MIT), WPE WebKit (LGPL-2.1/BSD), Cog (MIT), Mesa 3D (MIT), seatd (MIT), mpg123 (LGPL-2.1), ALSA (LGPL-2.1 / GPL-2.0), NetworkManager (GPL-2.0+), BlueZ (GPL-2.0+), DejaVu Fonts (Bitstream Vera / domaine public).
+
+### Moteur média (service Kernel `media.*`)
+FFmpeg compilé en **version GPL** (GPL-2.0+), avec x264 (GPL-2.0+), x265 (GPL-2.0+), libvpx (BSD-3-Clause), Opus (BSD-3-Clause), LAME (LGPL-2.0+), libvorbis et libogg (BSD-3-Clause), libwebp (BSD-3-Clause).
+Le code de Weed OS reste sous licence MIT ; l'image ISO qui embarque ce FFmpeg GPL doit être distribuée avec les sources correspondantes (Buildroot les télécharge dans `dl/` ; conservez-les et la configuration utilisée). Voir `docs/MEDIA-FFMPEG.md`.
 Licences données à titre informatif : les textes fournis avec chaque composant font foi. `make legal-info` (Buildroot) génère le dossier de conformité à joindre à une ISO distribuée.

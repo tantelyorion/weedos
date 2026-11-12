@@ -27,6 +27,12 @@ final class Security
         return $key;
     }
 
+    /** v1.0.2 — HMAC-SHA256 de la clé locale (jetons d'URL média signés). */
+    public static function mac(string $data): string
+    {
+        return hash_hmac('sha256', $data, self::key());
+    }
+
     private static function digest(string $dir): string
     {
         if (is_link($dir) || !is_dir($dir)) throw new \RuntimeException('dossier Programme non sécurisé');

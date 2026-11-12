@@ -15,6 +15,7 @@ final class Syscalls
         if (in_array($name, self::ADMIN, true) && $this->user['role'] !== 'admin') {
             throw new \RuntimeException('réservé aux administrateurs');
         }
+        if (str_starts_with($name, 'media.')) return $this->media($name, $a);
         $s = fn(string $k, string $d = '') => (string)($a[$k] ?? $d);
         switch ($name) {
             case 'system.install.disks': return (new DiskInstaller($this->user))->disks();
@@ -89,6 +90,54 @@ final class Syscalls
             return (new ProgramWorker())->call($m[1], $m[2], $a, $this->user);
         }
         throw new \RuntimeException("syscall inconnu: $name");
+    }
+
+    /**
+     * v1.0.2 — service média (FFmpeg). Appelé par le bureau (utilisateur) ou, via le pont, par un Programme :
+     * le pont ajoute alors __app ; le Kernel exige que le Programme soit actif, qu'il déclare « app.<id>.media »
+     * dans son manifest.json ET qu'un administrateur ait accordé cette permission.
+     */
+    private function media(string $name, array $a): mixed
+    {
+        $app = null;
+        if (array_key_exists('__app', $a)) {
+            $app = (string)$a['__app'];
+            unset($a['__app']);
+            $this->requireMediaGrant($app);
+        }
+        $u = $this->user['name'];
+        $vfs = new Vfs($u);
+        $path = (string)($a['path'] ?? '');
+        switch ($name) {
+            case 'media.status': return Media::status();
+            case 'media.probe': return Media::probe($vfs, $path);
+            case 'media.thumbnail': return Media::thumbnail($vfs, $a);
+            case 'media.url': return Media::url($u, $path);
+            case 'media.convert': return Media::convert($vfs, $u, $app, $a);
+            case 'media.extract_audio': return Media::extractAudio($vfs, $u, $app, $a);
+            case 'media.trim': return Media::trim($vfs, $u, $app, $a);
+            case 'media.render': return Media::render($vfs, $u, $app, $a);
+            case 'media.concat': return Media::concat($vfs, $u, $app, $a);
+            case 'media.job.status': return Media::jobStatus($u, $app, (string)($a['id'] ?? ''));
+            case 'media.job.list': return Media::jobList($u, $app);
+            case 'media.job.cancel': return Media::jobCancel($u, $app, (string)($a['id'] ?? ''));
+        }
+        throw new \RuntimeException("syscall inconnu: $name");
+    }
+
+    private function requireMediaGrant(string $id): void
+    {
+        $permission = 'app.' . $id . '.media';
+        $manifest = preg_match('/^[a-z0-9][a-z0-9-]{1,39}$/', $id) ? $this->pkg->manifest($id) : null;
+        $declared = is_array($manifest['permissions'] ?? null) ? $manifest['permissions'] : [];
+        if ($manifest === null || !$this->pkg->isEnabled($id) || !in_array($permission, $declared, true)) {
+            Log::security('APP_ACCESS_DENIED', ['app' => substr($id, 0, 40), 'permission' => $permission, 'reason' => 'undeclared-or-disabled']);
+            throw new \RuntimeException('permission du Programme refusée');
+        }
+        if (!AppPermissionManager::isGranted($id, $permission)) {
+            Log::security('APP_ACCESS_DENIED', ['app' => $id, 'permission' => $permission, 'reason' => 'not-granted']);
+            throw new \RuntimeException('permission du Programme non accordée (un administrateur doit accorder « ' . $permission . ' »)');
+        }
     }
 
     public function procs(): array

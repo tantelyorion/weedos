@@ -216,6 +216,14 @@ Dans Weed OS, une app s'appelle un **Programme**. C'est un `.zip` contenant `man
 - **Installation** (compte administrateur) : app **Programmes** → choisir le `.zip` → Installer → relire les permissions → **Activer**. Un Programme installé est inactif par défaut.
 - Exemples fournis dans `apps-src/` (Hello Weed, Calculatrice, Notes) : `make apps` produit `build/apps/*.zip`.
 
+### Service média FFmpeg (1.0.2)
+
+FFmpeg (version **GPL**, avec x264/x265) est embarqué par défaut dans l'ISO et exposé aux Programmes par le Kernel :
+`weed.media.probe/convert/extractAudio/trim/render/concat/thumbnail/url/job/cancel/wait`. Un Programme de montage vidéo n'a donc
+pas besoin de son propre FFmpeg. Permission à déclarer : `app.<id>.media`, **accordée par un administrateur** (app « Permissions
+des applications », bouton Accorder). Programme d'exemple : `apps-src/media-lab`. Détails, limites et licence : `docs/MEDIA-FFMPEG.md`.
+Test : `make check-media`.
+
 **Sécurité** : l'installateur refuse les chemins `..`, absolus ou avec `\`, limite la taille décompressée (20 Mo) et ne sert jamais de fichiers `.php`. Depuis la 0.8.6, `hooks.php` s'exécute dans un worker PHP sous le compte Unix `weedworker` (UID/GID 990), sans droit root ; le code est en lecture seule et chaque Programme a son dossier `appdata/<id>`. L'isolation reste partielle (pas de chroot/seccomp, UID partagé) : n'installez que des Programmes de confiance.
 
 ### Bureau, fichiers et sons (0.8.7)

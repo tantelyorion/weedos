@@ -564,6 +564,27 @@ final class Vfs
         return $target;
     }
 
+    /** v1.0.2 — chemin réel d'un fichier existant, pour le service média (jamais exposé aux Programmes). */
+    public function resolve(string $path): string
+    {
+        $n = $this->norm($path);
+        $full = $this->real($n);
+        if (is_link($full) || !is_file($full)) throw new \RuntimeException('fichier introuvable : ' . $n);
+        return $full;
+    }
+
+    /** v1.0.2 — chemin d'un fichier à créer : [chemin virtuel, chemin réel] ; dossier parent existant, aucune redirection. */
+    public function resolveNew(string $path): array
+    {
+        $n = $this->norm($path);
+        if ($n === '/') throw new \RuntimeException('destination invalide');
+        $full = $this->real($n);
+        $dir = dirname($full);
+        if (is_link($dir) || !is_dir($dir)) throw new \RuntimeException('dossier de destination introuvable');
+        if (is_link($full) || is_dir($full)) throw new \RuntimeException('destination invalide');
+        return [$n, $full];
+    }
+
     /** v0.8.7 — informations pour servir un fichier (lecture en flux : vidéo, audio, images, PDF). */
     public function fileInfo(string $path): array
     {

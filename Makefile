@@ -1,5 +1,5 @@
 # Weed OS - Makefile principal
-.PHONY: help install check-php check-project check-metrics check-processes check-services check-security-audit check-startup check-startup-audio check-sessions check-eventlog check-app-permissions check-kernel-policy check-storage check-users check-security check-worker check-isolation check-files check-desktop check-features check-browser check-mail check-connectivity check-installer check-foundations check-build-host check-locales dev assets boot-stub init iso qemu wsl-setup wsl-build apps clean
+.PHONY: help install check-php check-project check-metrics check-processes check-services check-security-audit check-startup check-startup-audio check-sessions check-eventlog check-app-permissions check-kernel-policy check-storage check-users check-security check-worker check-isolation check-files check-desktop check-features check-browser check-mail check-connectivity check-installer check-media check-foundations check-build-host check-locales dev assets boot-stub init iso qemu wsl-setup wsl-build apps clean
 help:
 	@echo "make install    - verifie PHP puis installe les assets"
 	@echo "make dev        - lance Weed OS en mode développement (PHP requis) sur http://127.0.0.1:8080"
@@ -30,6 +30,7 @@ help:
 	@echo "make check-browser   - teste la persistance et le filtrage des données Gnanja Browser"
 	@echo "make check-mail      - teste le décodage MIME, les pièces jointes, les brouillons chiffrés et les dossiers IMAP"
 	@echo "make check-connectivity - teste les validations Wi-Fi, Ethernet et Bluetooth sans matériel réel"
+	@echo "make check-media     - teste le service média FFmpeg (sonde, conversion, montage, miniature, jeton, annulation ; ignoré sans ffmpeg)"
 	@echo "make check-installer    - teste les garde-fous de l’installateur sans écrire sur un disque"
 	@echo "make check-foundations - teste RBAC, diagnostic Kernel et préparation UEFI/GPT"
 	@echo "make check-build-host - vérifie les outils nécessaires à la compilation ISO"
@@ -90,6 +91,8 @@ check-connectivity:
 	php tests/connectivity-smoke.php
 check-installer:
 	php tests/installer-smoke.php
+check-media:
+	php tests/media-smoke.php
 check-foundations:
 	php tests/kernel-foundations-smoke.php
 check-isolation:
